@@ -9,7 +9,7 @@ export default function LotteryEntrance() {
   const [numPlayers, setNumPlayers] = useState("0");
   const [recentWinner, setRecentWinner] = useState("0");
 
-  const { chainId: chainIdHex, isWeb3Enabled } = useMoralis();
+  const { chainId: chainIdHex, isWeb3Enabled, web3 } = useMoralis();
   const chainId = parseInt(chainIdHex);
   const raffleAddress =
     chainId in contractAddresses ? contractAddresses[chainId][0] : null;
@@ -45,23 +45,26 @@ export default function LotteryEntrance() {
     params: {},
   });
 
+  async function updateUI() {
+    const entranceFeeFromCall = (await getEntranceFee()).toString();
+    const numPlayersFromCall = (await getNumberOfPlayers()).toString();
+    const recentWinnerFromCall = await getRecentWinner();
+    setEntranceFee(entranceFeeFromCall);
+    setNumPlayers(numPlayersFromCall);
+    setRecentWinner(recentWinnerFromCall);
+  }
+
   useEffect(() => {
     if (isWeb3Enabled) {
-      async function updateUI() {
-        const entranceFeeFromCall = (await getEntranceFee()).toString();
-        const numPlayersFromCall = (await getNumberOfPlayers()).toString();
-        const recentWinnerFromCall = await getRecentWinner();
-        setEntranceFee(entranceFeeFromCall);
-        setNumPlayers(numPlayersFromCall);
-        setRecentWinner(recentWinnerFromCall);
-      }
       updateUI();
+      setUpEventListener();
     }
   }, [isWeb3Enabled]);
 
   const handleSuccess = async function (tx) {
     await tx.wait(1);
     handleNewNotification(tx);
+    updateUI();
   };
 
   const handleNewNotification = function () {
@@ -71,6 +74,13 @@ export default function LotteryEntrance() {
       title: "Tx Notification",
       position: "topR",
       icon: "bell",
+    });
+  };
+
+  const setUpEventListener = function () {
+    let raffleContract = new ethers.Contract(raffleAddress, abi, web3);
+    raffleContract.on("WinnerPicked", () => {
+      updateUI();
     });
   };
 
